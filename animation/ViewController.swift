@@ -8,23 +8,28 @@
 
 import UIKit
 
-class ViewController: UIViewController {
+class ViewController: UIViewController, UITextFieldDelegate {
 
     var playButton = UIButton()
     var forwardButton = UIButton()
     var backButton = UIButton()
+    
+    @IBOutlet weak var searchTextField: UITextField!
+    
     var played = false
     
-    let url = URL(string: "https://apple.com")!
+    let baseURL = URL(string: "https://itunes.apple.com/search")!
+    var query = [
+        "term": ""
+    ]
     
     override func viewDidLoad() {
         super.viewDidLoad()
         
-        startURL()
-        
         playButton = UIButton(frame: CGRect(x: 0, y: 0, width: Int(self.view.frame.width/4.5), height: Int(self.view.frame.width/4.5)))
         forwardButton = UIButton(frame: CGRect(x: 0, y: 0, width: Int(self.view.frame.width/4), height: Int(self.view.frame.width/5.5)))
         backButton = UIButton(frame: CGRect(x: 0, y: 0, width: Int(self.view.frame.width/4), height: Int(self.view.frame.width/5.5)))
+        searchTextField.frame = CGRect(x: 20, y: 50, width: Int(self.view.frame.width-40), height: Int(self.view.frame.width/6))
         
         startBack()
         startUI()
@@ -33,22 +38,45 @@ class ViewController: UIViewController {
     //MARK: - ... URL
     
     func startURL() {
+        
+        let url = baseURL.withQueries(query)!
+        print(Date(), #function, #line, url.absoluteURL)
         let task = URLSession.shared.dataTask(with: url) { data, response, error in
             guard let data = data else {
                 if let error = error {
                     print(#function, #line, error.localizedDescription)
+                    
                 }
                 return
             }
             let string = String(data: data, encoding: .utf8) ?? "Data not found"
             print(Date(), #function, #line, data)
             print(string)
+            
         }
         task.resume()
         print(Date(), #function, #line)
     }
     
-    //MARK: - ... Button animation
+    //MARK: - ... Events
+    
+    func textFieldShouldReturn(_ textField: UITextField) -> Bool {
+        self.view.endEditing(true)
+        query["term"] = searchTextField.text
+        UIView.animate(withDuration: 0.1, delay: 0, animations: {
+            self.searchTextField.transform = CGAffineTransform(scaleX: 1, y: 1)
+            self.searchTextField.alpha = 0.7
+        })
+        startURL()
+        return false
+    }
+    
+    @objc func animateTextFieldBegin() {
+        UIView.animate(withDuration: 0.1, delay: 0, animations: {
+            self.searchTextField.transform = CGAffineTransform(scaleX: 1.1, y: 1.1)
+            self.searchTextField.alpha = 1
+        })
+    }
     
     @objc func animatePlayButton() {
         UIView.animate(withDuration: 0.1, delay: 0, animations: {
@@ -92,7 +120,7 @@ class ViewController: UIViewController {
         }
     }
     
-    // MARK: - ... Interface
+    // MARK: - ... UI
     
     func startBack() {
         for _ in 1...7 {
@@ -147,9 +175,20 @@ class ViewController: UIViewController {
         backButton.layer.cornerRadius = CGFloat(self.view.frame.width/15)
         backButton.addTarget(self, action: #selector(animateBackButton), for: .touchUpInside)
         
+        searchTextField.alpha = 0
+        searchTextField.backgroundColor = .red
+        searchTextField.textColor = .white
+        searchTextField.font = .systemFont(ofSize: self.view.frame.width/10)
+        searchTextField.center = CGPoint(x: Int(self.view.frame.width/2), y: 0)
+        searchTextField.layer.cornerRadius = CGFloat(self.view.frame.width/15)
+        searchTextField.textAlignment = .center
+        searchTextField.keyboardType = .webSearch
+        searchTextField.addTarget(self, action: #selector(animateTextFieldBegin), for: .editingDidBegin)
+        
         self.view.addSubview(backButton)
         self.view.addSubview(forwardButton)
         self.view.addSubview(playButton)
+        self.view.addSubview(searchTextField)
         
         UIView.animate(withDuration: 0.5, delay: 1, animations: {
             self.backButton.center = self.leftView()
@@ -162,7 +201,7 @@ class ViewController: UIViewController {
         }
         
         UIView.animate(withDuration: 0.5, delay: 0.5, animations: {
-            self.playButton.center = self.centerView()
+            self.playButton.center = self.centerDownView()
             self.playButton.alpha = 0.5
         }) { _ in
             UIView.animate(withDuration: 0.5, delay: 0.7, animations: {
@@ -180,11 +219,24 @@ class ViewController: UIViewController {
                 self.forwardButton.alpha = 0.7
             })
         }
+        
+        UIView.animate(withDuration: 0.5, delay: 0.5, animations: {
+            self.searchTextField.center = self.centerUpView()
+            self.searchTextField.alpha = 0.7
+        })
     }
     
     // MARK: - ... Position
 
+    func centerUpView() -> CGPoint {
+        return CGPoint(x: Int(self.view.frame.width/2), y: Int(self.view.frame.height*0.15))
+    }
+    
     func centerView() -> CGPoint {
+        return CGPoint(x: Int(self.view.frame.width/2), y: Int(self.view.frame.height/2))
+    }
+    
+    func centerDownView() -> CGPoint {
         return CGPoint(x: Int(self.view.frame.width/2), y: Int(self.view.frame.height*0.75))
     }
     
@@ -230,6 +282,7 @@ class ViewController: UIViewController {
         }
     }
 
+    
 
 }
 
