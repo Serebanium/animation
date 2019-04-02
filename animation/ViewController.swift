@@ -205,6 +205,7 @@ class ViewController: UIViewController {
         searchTextField.backgroundColor = .red
         searchTextField.textColor = .white
         searchTextField.font = .systemFont(ofSize: self.view.frame.width/10)
+        searchTextField.placeholder = "исполнитель"
         searchTextField.center = CGPoint(x: Int(self.view.frame.width/2), y: 0)
         searchTextField.layer.cornerRadius = CGFloat(self.view.frame.width/15)
         searchTextField.textAlignment = .center
