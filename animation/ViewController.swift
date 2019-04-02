@@ -8,13 +8,13 @@
 
 import UIKit
 
-class ViewController: UIViewController, UITextFieldDelegate {
+class ViewController: UIViewController {
 
     var playButton = UIButton()
     var forwardButton = UIButton()
     var backButton = UIButton()
-    
-    @IBOutlet weak var searchTextField: UITextField!
+    var searchTextField = UITextField()
+    var searchButton = UIButton()
     
     var played = false
     
@@ -29,7 +29,8 @@ class ViewController: UIViewController, UITextFieldDelegate {
         playButton = UIButton(frame: CGRect(x: 0, y: 0, width: Int(self.view.frame.width/4.5), height: Int(self.view.frame.width/4.5)))
         forwardButton = UIButton(frame: CGRect(x: 0, y: 0, width: Int(self.view.frame.width/4), height: Int(self.view.frame.width/5.5)))
         backButton = UIButton(frame: CGRect(x: 0, y: 0, width: Int(self.view.frame.width/4), height: Int(self.view.frame.width/5.5)))
-        searchTextField.frame = CGRect(x: 20, y: 50, width: Int(self.view.frame.width-40), height: Int(self.view.frame.width/6))
+        searchTextField = UITextField(frame: CGRect(x: 20, y: 50, width: Int(self.view.frame.width-40), height: Int(self.view.frame.width/6)))
+        searchButton = UIButton(frame: CGRect(x: 0, y: 0, width: 0, height: 0))
         
         startBack()
         startUI()
@@ -60,21 +61,37 @@ class ViewController: UIViewController, UITextFieldDelegate {
     
     //MARK: - ... Events
     
-    func textFieldShouldReturn(_ textField: UITextField) -> Bool {
-        self.view.endEditing(true)
-        query["term"] = searchTextField.text
+    @objc func animateSearchButtonTaped() {
+        view.endEditing(true)
+        if searchTextField.text != "" {
+            query["term"] = searchTextField.text
+            startURL()
+        }
         UIView.animate(withDuration: 0.1, delay: 0, animations: {
             self.searchTextField.transform = CGAffineTransform(scaleX: 1, y: 1)
             self.searchTextField.alpha = 0.7
-        })
-        startURL()
-        return false
+            self.searchButton.alpha = 0
+        }){ _ in
+            self.searchButton.frame = CGRect(x: 0, y: 0, width: 0, height: 0)
+        }
+        
+    }
+    
+    @objc func animateEditing() {
+        if searchTextField.text != "" {
+            searchButton.setTitle("найти", for: [])
+        } else {
+            searchButton.setTitle("отменить", for: [])
+        }
     }
     
     @objc func animateTextFieldBegin() {
+        searchButton.frame = CGRect(x: 30, y: 60+Int(self.view.frame.width/6), width: Int(self.view.frame.width-60), height: Int(self.view.frame.width/6))
+        searchButton.center = centerSubUpView()
         UIView.animate(withDuration: 0.1, delay: 0, animations: {
             self.searchTextField.transform = CGAffineTransform(scaleX: 1.1, y: 1.1)
             self.searchTextField.alpha = 1
+            self.searchButton.alpha = 1
         })
     }
     
@@ -175,6 +192,15 @@ class ViewController: UIViewController, UITextFieldDelegate {
         backButton.layer.cornerRadius = CGFloat(self.view.frame.width/15)
         backButton.addTarget(self, action: #selector(animateBackButton), for: .touchUpInside)
         
+        searchButton.alpha = 0
+        searchButton.backgroundColor = .red
+        searchButton.setTitleColor(.white, for: [])
+        searchButton.setTitle("отменить", for: [])
+        searchButton.titleLabel?.font = .systemFont(ofSize: self.view.frame.width/10)
+        searchButton.center = CGPoint(x: Int(self.view.frame.width/2), y: 0)
+        searchButton.layer.cornerRadius = CGFloat(self.view.frame.width/15)
+        searchButton.addTarget(self, action: #selector(animateSearchButtonTaped), for: .touchUpInside)
+        
         searchTextField.alpha = 0
         searchTextField.backgroundColor = .red
         searchTextField.textColor = .white
@@ -182,12 +208,14 @@ class ViewController: UIViewController, UITextFieldDelegate {
         searchTextField.center = CGPoint(x: Int(self.view.frame.width/2), y: 0)
         searchTextField.layer.cornerRadius = CGFloat(self.view.frame.width/15)
         searchTextField.textAlignment = .center
-        searchTextField.keyboardType = .webSearch
         searchTextField.addTarget(self, action: #selector(animateTextFieldBegin), for: .editingDidBegin)
+        searchTextField.addTarget(self, action: #selector(animateEditing), for: .allEditingEvents)
+        
         
         self.view.addSubview(backButton)
         self.view.addSubview(forwardButton)
         self.view.addSubview(playButton)
+        self.view.addSubview(searchButton)
         self.view.addSubview(searchTextField)
         
         UIView.animate(withDuration: 0.5, delay: 1, animations: {
@@ -230,6 +258,10 @@ class ViewController: UIViewController, UITextFieldDelegate {
 
     func centerUpView() -> CGPoint {
         return CGPoint(x: Int(self.view.frame.width/2), y: Int(self.view.frame.height*0.15))
+    }
+    
+    func centerSubUpView() -> CGPoint {
+        return CGPoint(x: Int(self.view.frame.width/2), y: Int(self.view.frame.height*0.3))
     }
     
     func centerView() -> CGPoint {
