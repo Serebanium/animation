@@ -7,17 +7,26 @@
 //
 
 import UIKit
+import AVFoundation
 
-class ViewController: UIViewController {
+class ViewController: UIViewController, AVAudioPlayerDelegate {
 
     var playButton = UIButton()
     var forwardButton = UIButton()
     var backButton = UIButton()
     var searchTextField = UITextField()
     var searchButton = UIButton()
+    var nameLabel = UILabel()
+    var artistLabel = UILabel()
+    var activity = UIActivityIndicatorView()
+    
+    var player = AVAudioPlayer()
+    
+    var playList: [Track] = []
     
     var played = false
-    
+    var isLoad = false
+    var trackNumber = 0
     let baseURL = URL(string: "https://itunes.apple.com/search")!
     var query = [
         "term": ""
@@ -31,6 +40,9 @@ class ViewController: UIViewController {
         backButton = UIButton(frame: CGRect(x: 0, y: 0, width: Int(self.view.frame.width/4), height: Int(self.view.frame.width/5.5)))
         searchTextField = UITextField(frame: CGRect(x: 20, y: 50, width: Int(self.view.frame.width-40), height: Int(self.view.frame.width/6)))
         searchButton = UIButton(frame: CGRect(x: 0, y: 0, width: 0, height: 0))
+        nameLabel = UILabel(frame: CGRect(x: 0, y: 0, width: Int(self.view.frame.width-60), height: Int(self.view.frame.width/6)))
+        artistLabel = UILabel(frame: CGRect(x: 0, y: 0, width: Int(self.view.frame.width-60), height: Int(self.view.frame.width/8)))
+        activity = UIActivityIndicatorView(frame: CGRect(x: 0, y: 0, width: Int(self.view.frame.width-60), height: Int(self.view.frame.width-60)))
         
         startBack()
         startUI()
@@ -40,32 +52,114 @@ class ViewController: UIViewController {
     
     func startURL() {
         
+        playList = []
+        self.nameLabel.alpha = 0
+        self.artistLabel.alpha = 0
+        self.activity.alpha = 0.7
+        
         let url = baseURL.withQueries(query)!
         print(Date(), #function, #line, url.absoluteURL)
         let task = URLSession.shared.dataTask(with: url) { data, response, error in
             guard let data = data else {
                 if let error = error {
                     print(#function, #line, error.localizedDescription)
-                    
+                    DispatchQueue.main.async {
+                    self.activity.alpha = 0
+                    self.nameLabel.alpha = 0.7
+                    self.nameLabel.text = "не найдено"
+                    }
                 }
                 return
             }
-            let string = String(data: data, encoding: .utf8) ?? "Data not found"
-            print(Date(), #function, #line, data)
-            print(string)
+            let jsonDecoder = JSONDecoder()
+            guard let dictionary = try? jsonDecoder.decode(PlayList.self, from: data)
+                else {
+                    print(Date(), #function, #line, "Can't decode!")
+                    DispatchQueue.main.async {
+                        self.activity.alpha = 0
+                        self.nameLabel.alpha = 0.7
+                        self.nameLabel.text = "не найдено"
+                    }
+                    return
+            }
             
+            for i in dictionary.results {
+                if i.previewUrl != nil {
+                    self.playList.append(Track(name: i.name, artist: i.artist, previewUrl: i.previewUrl!))
+                }
+            }
+            
+            self.playList = self.playList.filter { $0.previewUrl.hasPrefix("https://audio") }
+            for i in self.playList {
+                print("---")
+                print(i.artist)
+                print(i.name)
+                print(i.previewUrl)
+            }
+            
+            DispatchQueue.main.async {
+                self.activity.alpha = 0
+                if self.playList.count > 0 {
+                    self.nameLabel.text = self.playList[0].name
+                    self.artistLabel.text = self.playList[0].artist
+                    self.nameLabel.alpha = 0.7
+                    self.artistLabel.alpha = 0.7
+                    
+                }
+            }
         }
         task.resume()
-        print(Date(), #function, #line)
+        
+    }
+    
+    func loadTrack(url: URL) {
+        activity.alpha = 0.7
+        
+        let task = URLSession.shared.dataTask(with: url) { data, _, _ in
+            guard let data = data else { return }
+            print("Пришли данные", data)
+            do {
+                self.player = try AVAudioPlayer(data: data)
+                self.player.delegate = self
+                self.player.prepareToPlay()
+                self.player.play()
+            } catch {
+                print("Не получается")
+            }
+            DispatchQueue.main.async {
+            self.activity.alpha = 0
+            }
+        }
+        task.resume()
+    
     }
     
     //MARK: - ... Events
+    
+    func audioPlayerDidFinishPlaying(_ player: AVAudioPlayer, successfully flag: Bool) {
+        isLoad = false
+        played = false
+        playButton.setTitle(">", for: [])
+    }
+    
+    @objc func stopPlay() {
+        
+    }
     
     @objc func animateSearchButtonTaped() {
         view.endEditing(true)
         if searchTextField.text != "" {
             query["term"] = searchTextField.text
             startURL()
+            searchTextField.text = ""
+            isLoad = false
+            playButton.setTitle(">", for: [])
+            trackNumber = 0
+            if played {
+                player.stop()
+                played = false
+            }
+            
         }
         UIView.animate(withDuration: 0.1, delay: 0, animations: {
             self.searchTextField.transform = CGAffineTransform(scaleX: 1, y: 1)
@@ -74,7 +168,6 @@ class ViewController: UIViewController {
         }){ _ in
             self.searchButton.frame = CGRect(x: 0, y: 0, width: 0, height: 0)
         }
-        
     }
     
     @objc func animateEditing() {
@@ -105,10 +198,18 @@ class ViewController: UIViewController {
                 self.playButton.alpha = 0.7
             })
         }
+        guard playList.count > 0 else { return }
         if played {
             self.playButton.setTitle(">", for: [])
+            player.pause()
         } else {
             self.playButton.setTitle("||", for: [])
+            if isLoad == false {
+                loadTrack(url: URL(string: playList[trackNumber].previewUrl)!)
+                isLoad = true
+            } else {
+            player.play()
+            }
         }
         played.toggle()
     }
@@ -123,6 +224,21 @@ class ViewController: UIViewController {
                 self.backButton.alpha = 0.7
             })
         }
+        
+        guard playList.count > 0 else { return }
+        if trackNumber > 0 {
+            trackNumber -= 1
+        } else {
+            trackNumber = playList.count-1
+        }
+        if played {
+            player.stop()
+        }
+        played = false
+        isLoad = false
+        playButton.setTitle(">", for: [])
+        nameLabel.text = playList[trackNumber].name
+        artistLabel.text = playList[trackNumber].artist
     }
     
     @objc func animateForwardButton() {
@@ -135,6 +251,21 @@ class ViewController: UIViewController {
                 self.forwardButton.alpha = 0.7
             })
         }
+        
+        guard playList.count > 0 else { return }
+        if trackNumber <  playList.count-1 {
+            trackNumber += 1
+        } else {
+            trackNumber = 0
+        }
+        if played {
+            player.stop()
+        }
+        played = false
+        isLoad = false
+        playButton.setTitle(">", for: [])
+        nameLabel.text = playList[trackNumber].name
+        artistLabel.text = playList[trackNumber].artist
     }
     
     // MARK: - ... UI
@@ -205,12 +336,31 @@ class ViewController: UIViewController {
         searchTextField.backgroundColor = .red
         searchTextField.textColor = .white
         searchTextField.font = .systemFont(ofSize: self.view.frame.width/10)
-        searchTextField.placeholder = "исполнитель"
+        searchTextField.placeholder = "поиск"
         searchTextField.center = CGPoint(x: Int(self.view.frame.width/2), y: 0)
         searchTextField.layer.cornerRadius = CGFloat(self.view.frame.width/15)
         searchTextField.textAlignment = .center
         searchTextField.addTarget(self, action: #selector(animateTextFieldBegin), for: .editingDidBegin)
         searchTextField.addTarget(self, action: #selector(animateEditing), for: .allEditingEvents)
+        
+        nameLabel.alpha = 0
+        nameLabel.textColor = .red
+        nameLabel.font = .systemFont(ofSize: self.view.frame.width/10)
+        nameLabel.center = centerViewUp()
+        nameLabel.textAlignment = .center
+        
+        artistLabel.alpha = 0
+        artistLabel.textColor = .red
+        artistLabel.font = .systemFont(ofSize: self.view.frame.width/15)
+        artistLabel.center = centerViewDown()
+        artistLabel.textAlignment = .center
+        
+        activity.alpha = 0
+        activity.center = centerView()
+        activity.style = .whiteLarge
+        activity.color = .red
+        activity.startAnimating()
+        
         
         
         self.view.addSubview(backButton)
@@ -218,6 +368,9 @@ class ViewController: UIViewController {
         self.view.addSubview(playButton)
         self.view.addSubview(searchButton)
         self.view.addSubview(searchTextField)
+        self.view.addSubview(nameLabel)
+        self.view.addSubview(artistLabel)
+        self.view.addSubview(activity)
         
         UIView.animate(withDuration: 0.5, delay: 1, animations: {
             self.backButton.center = self.leftView()
@@ -267,6 +420,14 @@ class ViewController: UIViewController {
     
     func centerView() -> CGPoint {
         return CGPoint(x: Int(self.view.frame.width/2), y: Int(self.view.frame.height/2))
+    }
+    
+    func centerViewUp() -> CGPoint {
+        return CGPoint(x: Int(self.view.frame.width/2), y: Int((self.view.frame.height/2)*0.9))
+    }
+    
+    func centerViewDown() -> CGPoint {
+        return CGPoint(x: Int(self.view.frame.width/2), y: Int((self.view.frame.height/2)*1.1))
     }
     
     func centerDownView() -> CGPoint {
